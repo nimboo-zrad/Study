@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a34">
+<title>Study Pomodoro</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #e7eee9;
+    --surface: #f5f8f6;
+    --ink: #14302a;
+    --muted: #55706a;
+    --line: #c7d5ce;
+    --focus: #2d3f94;
+    --focus-soft: #d9defa;
+    --rest: #2f8453;
+    --rest-soft: #d3ecdc;
+    --on-accent: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101a18;
+      --surface: #182623;
+      --ink: #e4efea;
+      --muted: #93aca5;
+      --line: #2b3f3a;
+      --focus: #8fa0ff;
+      --focus-soft: #243063;
+      --rest: #6fcf92;
+      --rest-soft: #1c4630;
+      --on-accent: #0c1513;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 "Avenir Next", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 4px 0 16px; letter-spacing: -0.01em; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+  input[type=number] {
+    width: 100%;
+    font: inherit;
+    font-size: 1.1rem;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: var(--focus);
+    color: var(--on-accent);
+  }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .summary { margin: 12px 0 0; color: var(--muted); font-size: 0.92rem; }
+  .summary b { color: var(--ink); }
+
+  /* timer */
+  .timer { text-align: center; }
+  .timer.rest { --accent: var(--rest); --accent-soft: var(--rest-soft); }
+  .timer.focus { --accent: var(--focus); --accent-soft: var(--focus-soft); }
+  .ring { position: relative; width: 240px; height: 240px; margin: 8px auto 12px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 12; }
+  .ring .track { stroke: var(--accent-soft, var(--line)); }
+  .ring .bar { stroke: var(--accent, var(--focus)); stroke-linecap: round; transition: stroke-dashoffset 0.4s linear; }
+  .ring .center { position: absolute; inset: 0; display: grid; place-content: center; }
+  .time { font-size: 3.2rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+  .phase { margin-top: 6px; font-size: 0.95rem; color: var(--accent, var(--muted)); font-weight: 600; }
+  .controls { display: flex; gap: 10px; justify-content: center; }
+  .controls button { min-width: 96px; }
+  #startBtn { background: var(--accent, var(--focus)); }
+
+  .tip {
+    margin-top: 14px;
+    text-align: left;
+    background: var(--accent-soft, var(--bg));
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .tip p { margin: 0; }
+  .tip small { color: var(--muted); }
+  .tip button { margin-top: 8px; padding: 6px 12px; font-size: 0.85rem; }
+
+  /* schedule */
+  ol { list-style: none; margin: 0; padding: 0; }
+  li.seg {
+    display: grid;
+    grid-template-columns: 54px 1fr auto;
+    gap: 10px;
+    align-items: start;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+  }
+  li.seg:first-child { border-top: 0; }
+  li.seg .clock { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.88rem; padding-top: 2px; }
+  li.seg .name { font-weight: 600; }
+  li.seg .tipline { color: var(--muted); font-size: 0.85rem; }
+  li.seg .mins { font-variant-numeric: tabular-nums; font-weight: 600; }
+  li.seg.focus .name { color: var(--focus); }
+  li.seg.rest .name { color: var(--rest); }
+  li.seg.done { opacity: 0.45; }
+  li.seg.current { background: var(--bg); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 10px; }
+
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  .note { font-size: 0.82rem; color: var(--muted); margin: 6px 0 0; }
+  .today-line { margin: -8px 0 16px; color: var(--muted); font-size: 0.92rem; }
+  .today-line a { color: var(--focus); font-weight: 600; text-decoration: none; }
+
+  /* reading log */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stats div { background: var(--bg); border-radius: 12px; padding: 8px 6px; text-align: center; }
+  .stats b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 0.75rem; color: var(--muted); }
+  .goalbar { height: 8px; border-radius: 99px; background: var(--focus-soft); overflow: hidden; }
+  .goalbar div { height: 100%; width: 0; background: var(--focus); border-radius: 99px; transition: width 0.4s; }
+  .goalrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 16px; }
+  .goalrow label { margin: 0; }
+  .goalrow input { width: 90px; padding: 6px 10px; font-size: 1rem; }
+  .calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .calhead button { padding: 6px 14px; font-size: 1.1rem; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal .wd { text-align: center; font-size: 0.75rem; color: var(--muted); padding-bottom: 2px; }
+  .cal button.day {
+    aspect-ratio: 1 / 1.05;
+    padding: 2px 0;
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    font-size: 0.82rem; font-weight: 500;
+    border: 2px solid transparent;
+  }
+  .cal button.day small { font-size: 0.66rem; font-variant-numeric: tabular-nums; min-height: 1em; }
+  .cal button.day.l1 { background: color-mix(in srgb, var(--focus) 16%, var(--bg)); }
+  .cal button.day.l2 { background: color-mix(in srgb, var(--focus) 32%, var(--bg)); }
+  .cal button.day.l3 { background: color-mix(in srgb, var(--focus) 52%, var(--bg)); }
+  .cal button.day.l4 { background: var(--focus); color: var(--on-accent); }
+  .cal button.day.is-today { border-color: var(--rest); }
+  .cal button.day.sel { outline: 3px solid var(--ink); outline-offset: 1px; }
+  .cal .blank { visibility: hidden; }
+  .dayinfo { margin: 12px 0 8px; font-weight: 600; }
+  .legend { display: flex; gap: 6px; align-items: center; font-size: 0.75rem; color: var(--muted); margin-top: 10px; }
+  .legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Study Pomodoro</h1>
+  <p class="today-line"><span id="todayLine">Today: 0 min</span> · <a href="#logBox">Reading log</a></p>
+
+  <section id="planBox">
+    <h2>Plan your session</h2>
+    <label for="total">How many minutes can you study in total?</label>
+    <input id="total" type="number" inputmode="numeric" min="10" max="720" value="180">
+
+    <details>
+      <summary>Timer settings</summary>
+      <div class="grid" style="margin-top:10px">
+        <div><label for="fm">Focus (min)</label><input id="fm" type="number" inputmode="numeric" min="5" max="90" value="25"></div>
+        <div><label for="sm">Short rest (min)</label><input id="sm" type="number" inputmode="numeric" min="1" max="30" value="5"></div>
+        <div><label for="lm">Long rest (min)</label><input id="lm" type="number" inputmode="numeric" min="5" max="60" value="20"></div>
+        <div><label for="cy">Focus rounds before long rest</label><input id="cy" type="number" inputmode="numeric" min="2" max="8" value="4"></div>
+      </div>
+      <p class="note">Tired after an hour? Try 25 / 5 / 20. If your eyes get heavy sooner, use 20 / 5 / 15.</p>
+    </details>
+
+    <div class="row" style="margin-top:14px">
+      <button id="planBtn">Make my plan</button>
+    </div>
+    <p class="summary" id="summary"></p>
+  </section>
+
+  <section id="timerBox" class="timer focus hidden">
+    <div class="ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="track" cx="60" cy="60" r="52"></circle>
+        <circle class="bar" id="bar" cx="60" cy="60" r="52"></circle>
+      </svg>
+      <div class="center">
+        <div class="time" id="time" role="timer" aria-live="off">25:00</div>
+        <div class="phase" id="phase">Focus 1 of 6</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="startBtn">Start</button>
+      <button id="skipBtn" class="ghost">Skip</button>
+      <button id="resetBtn" class="ghost">Reset</button>
+    </div>
+
+    <div class="tip hidden" id="tipBox">
+      <small id="tipLabel">Do this now</small>
+      <p id="tipText"></p>
+      <button class="ghost" id="tipBtn">Another idea</button>
+    </div>
+  </section>
+
+  <section id="listBox" class="hidden">
+    <h2>Schedule</h2>
+    <ol id="list"></ol>
+  </section>
+
+  <section id="logBox">
+    <h2>Reading log</h2>
+    <div class="stats">
+      <div><b id="stToday">0m</b><span>Today</span></div>
+      <div><b id="stWeek">0m</b><span>Last 7 days</span></div>
+      <div><b id="stMonth">0m</b><span>This month</span></div>
+      <div><b id="stStreak">0</b><span>Day streak</span></div>
+    </div>
+    <div class="goalbar" role="progressbar" aria-label="Progress toward daily goal" aria-valuemin="0" aria-valuemax="100" id="goalBar"><div id="goalFill"></div></div>
+    <div class="goalrow">
+      <label for="goal">Daily goal (minutes)</label>
+      <input id="goal" type="number" inputmode="numeric" min="5" max="720" value="120">
+    </div>
+
+    <div class="calhead">
+      <button class="ghost" id="prevM" aria-label="Previous month">&lsaquo;</button>
+      <strong id="monthName"></strong>
+      <button class="ghost" id="nextM" aria-label="Next month">&rsaquo;</button>
+    </div>
+    <div class="cal" id="cal"></div>
+    <div class="legend" aria-hidden="true">
+      <span>Less</span>
+      <i style="background:var(--bg);border:1px solid var(--line)"></i>
+      <i style="background:color-mix(in srgb, var(--focus) 16%, var(--bg))"></i>
+      <i style="background:color-mix(in srgb, var(--focus) 32%, var(--bg))"></i>
+      <i style="background:color-mix(in srgb, var(--focus) 52%, var(--bg))"></i>
+      <i style="background:var(--focus)"></i>
+      <span>Goal reached</span>
+    </div>
+
+    <div class="dayinfo" id="dayInfo"></div>
+    <label for="addMin">Read outside the timer? Add minutes to this day (use a minus to correct).</label>
+    <div class="row">
+      <input id="addMin" type="number" inputmode="numeric" placeholder="e.g. 30">
+      <button class="ghost" id="addBtn">Add</button>
+    </div>
+    <p class="note" id="storeNote"></p>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Rest ideas ---------- */
+  var SHORT_RESTS = [
+    "Look out of a window at something far away for 20 seconds, then close your eyes for 30 seconds.",
+    "Blink slowly 10 times. Reading makes you blink much less, which dries your eyes.",
+    "Drink a glass of water.",
+    "Stand up and stretch your neck, shoulders and wrists.",
+    "Splash cool water on your face and eyes.",
+    "Cover your closed eyes with warm palms for 30 seconds.",
+    "Walk around the room and take 5 slow deep breaths.",
+    "Roll your shoulders back 10 times and shake out your hands.",
+    "Step away from your desk and look at the farthest thing you can see.",
+    "Do 10 squats or 10 wall push-ups to wake your body up."
+  ];
+  var LONG_RESTS = [
+    "Take a 10 minute walk, ideally outside in daylight.",
+    "Eat a light snack (fruit, nuts, yogurt) and drink water.",
+    "Lie down with your eyes closed for 10 minutes. No phone.",
+    "Stretch your back, hips and legs for 5 minutes, then wash your face.",
+    "Step outside, get fresh air and look at the sky or something distant.",
+    "Make tea or a healthy drink and sit away from your study desk.",
+    "Do a short workout: 20 jumping jacks, 10 squats, 10 push-ups.",
+    "Tidy your desk, refill your water bottle and check your lighting."
+  ];
+  var PHONE_NOTE = "Tip: keep your phone away from your rest. Scrolling keeps your eyes and brain working.";
+
+  /* ---------- State ---------- */
+  var S = {
+    plan: [],
+    idx: 0,
+    running: false,
+    endAt: 0,
+    leftMs: 0,
+    logged: 0,
+    tipN: { s: 0, l: 0 }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = {
+    total: $("total"), fm: $("fm"), sm: $("sm"), lm: $("lm"), cy: $("cy"),
+    planBtn: $("planBtn"), summary: $("summary"),
+    timerBox: $("timerBox"), listBox: $("listBox"), list: $("list"),
+    time: $("time"), phase: $("phase"), bar: $("bar"),
+    startBtn: $("startBtn"), skipBtn: $("skipBtn"), resetBtn: $("resetBtn"),
+    tipBox: $("tipBox"), tipText: $("tipText"), tipLabel: $("tipLabel"), tipBtn: $("tipBtn")
+  };
+
+  var CIRC = 2 * Math.PI * 52;
+  el.bar.style.strokeDasharray = CIRC;
+
+  /* ---------- Saved settings (safe if storage is blocked) ---------- */
+  function save() {
+    try {
+      localStorage.setItem("pomo", JSON.stringify({
+        total: el.total.value, fm: el.fm.value, sm: el.sm.value, lm: el.lm.value, cy: el.cy.value
+      }));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem("pomo") || "null");
+      if (d) { for (var k in d) { if (el[k]) el[k].value = d[k]; } }
+    } catch (e) {}
+  }
+
+  /* ---------- Planning ---------- */
+  function num(input, min, max, fallback) {
+    var v = parseInt(input.value, 10);
+    if (isNaN(v)) v = fallback;
+    v = Math.max(min, Math.min(max, v));
+    input.value = v;
+    return v;
+  }
+
+  function buildPlan(total, f, s, l, c) {
+    var plan = [];
+    var rem = total, n = 0, shortCount = 0, longCount = 0;
+    var minFocus = Math.min(10, f);
+    while (rem >= minFocus) {
+      var thisFocus = Math.min(f, rem);
+      n++;
+      plan.push({ type: "focus", mins: thisFocus, n: n });
+      rem -= thisFocus;
+      if (rem < minFocus + 1) break;
+      var isLong = n % c === 0;
+      var b = isLong ? l : s;
+      if (rem - b < minFocus) break; // not enough time left for another useful round
+      var tip;
+      if (isLong) { tip = LONG_RESTS[longCount % LONG_RESTS.length]; longCount++; }
+      else { tip = SHORT_RESTS[shortCount % SHORT_RESTS.length]; shortCount++; }
+      plan.push({ type: "rest", mins: b, long: isLong, tip: tip });
+      rem -= b;
+    }
+    var rounds = n;
+    plan.forEach(function (p) { if (p.type === "focus") p.of = rounds; });
+    return plan;
+  }
+
+  function planTotals(plan) {
+    var focus = 0, rest = 0, rounds = 0;
+    plan.forEach(function (p) {
+      if (p.type === "focus") { focus += p.mins; rounds++; } else rest += p.mins;
+    });
+    return { focus: focus, rest: rest, rounds: rounds };
+  }
+
+  function makePlan() {
+    var total = num(el.total, 10, 720, 180);
+    var f = num(el.fm, 5, 90, 25);
+    var s = num(el.sm, 1, 30, 5);
+    var l = num(el.lm, 5, 60, 20);
+    var c = num(el.cy, 2, 8, 4);
+    save();
+    credit();
+    stopTicking();
+    S.logged = 0;
+    S.plan = buildPlan(total, f, s, l, c);
+    S.idx = 0;
+    S.running = false;
+    S.leftMs = S.plan[0].mins * 60000;
+    var t = planTotals(S.plan);
+    el.summary.innerHTML =
+      "<b>" + t.rounds + " focus rounds</b> = " + fmtDur(t.focus) + " of study, plus " +
+      fmtDur(t.rest) + " of rest. Total " + fmtDur(t.focus + t.rest) + ".";
+    el.timerBox.classList.remove("hidden");
+    el.listBox.classList.remove("hidden");
+    render();
+    el.timerBox.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ---------- Formatting ---------- */
+  function fmtDur(m) {
+    var h = Math.floor(m / 60), r = m % 60;
+    if (h && r) return h + " h " + r + " min";
+    if (h) return h + " h";
+    return r + " min";
+  }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmtClock(d) {
+    var h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? "PM" : "AM";
+    h = h % 12; if (h === 0) h = 12;
+    return h + ":" + pad(m) + " " + ap;
+  }
+  function fmtMs(ms) {
+    var sec = Math.max(0, Math.ceil(ms / 1000));
+    return pad(Math.floor(sec / 60)) + ":" + pad(sec % 60);
+  }
+
+  /* ---------- Rendering ---------- */
+  function segLabel(p) {
+    if (p.type === "focus") return "Focus " + p.n + " of " + p.of;
+    return p.long ? "Long rest" : "Short rest";
+  }
+
+  function currentLeft() {
+    return S.running ? Math.max(0, S.endAt - Date.now()) : S.leftMs;
+  }
+
+  function renderTimer() {
+    var p = S.plan[S.idx];
+    if (!p) return;
+    var left = currentLeft();
+    var total = p.mins * 60000;
+    el.time.textContent = fmtMs(left);
+    el.bar.style.strokeDashoffset = CIRC * (1 - left / total);
+    document.title = (S.running ? fmtMs(left) + " · " : "") + segLabel(p);
+  }
+
+  function render() {
+    var p = S.plan[S.idx];
+    if (!p) return;
+    el.timerBox.className = "timer " + p.type;
+    el.phase.textContent = segLabel(p);
+    el.startBtn.textContent = S.running ? "Pause" : (S.leftMs < p.mins * 60000 ? "Resume" : "Start");
+
+    if (p.type === "rest") {
+      el.tipBox.classList.remove("hidden");
+      el.tipLabel.textContent = p.long ? "Long rest: do this" : "Rest: do this";
+      el.tipText.textContent = p.tip + " " + PHONE_NOTE;
+    } else {
+      el.tipBox.classList.add("hidden");
+    }
+    renderTimer();
+    renderList();
+  }
+
+  function renderList() {
+    el.list.innerHTML = "";
+    var base = new Date(Date.now() + currentLeft());
+    var cursor = null;
+    S.plan.forEach(function (p, i) {
+      var li = document.createElement("li");
+      li.className = "seg " + p.type + (i < S.idx ? " done" : "") + (i === S.idx ? " current" : "");
+
+      var start;
+      if (i < S.idx) start = null;
+      else if (i === S.idx) { start = new Date(Date.now()); cursor = base; }
+      else { start = cursor; cursor = new Date(cursor.getTime() + p.mins * 60000); }
+
+      var clock = document.createElement("div");
+      clock.className = "clock";
+      clock.textContent = start ? fmtClock(start) : "done";
+
+      var mid = document.createElement("div");
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = segLabel(p);
+      mid.appendChild(name);
+      if (p.type === "rest") {
+        var tl = document.createElement("div");
+        tl.className = "tipline";
+        tl.textContent = p.tip;
+        mid.appendChild(tl);
+      }
+
+      var mins = document.createElement("div");
+      mins.className = "mins";
+      mins.textContent = p.mins + " min";
+
+      li.appendChild(clock); li.appendChild(mid); li.appendChild(mins);
+      el.list.appendChild(li);
+    });
+  }
+
+  /* ---------- Timer engine ---------- */
+  var ticker = null;
+  function startTicking() {
+    if (ticker) return;
+    ticker = setInterval(tick, 250);
+  }
+  function stopTicking() {
+    if (ticker) { clearInterval(ticker); ticker = null; }
+    S.running = false;
+    releaseWake();
+  }
+
+  function tick() {
+    if (!S.running) return;
+    credit();
+    if (S.endAt - Date.now() <= 0) { finishSegment(); return; }
+    renderTimer();
+  }
+
+  function start() {
+    var p = S.plan[S.idx];
+    if (!p) return;
+    S.running = true;
+    S.endAt = Date.now() + S.leftMs;
+    askNotify();
+    unlockAudio();
+    requestWake();
+    startTicking();
+    render();
+  }
+
+  function pause() {
+    S.leftMs = Math.max(0, S.endAt - Date.now());
+    credit();
+    stopTicking();
+    render();
+  }
+
+  function goTo(i, autoStart) {
+    credit();
+    stopTicking();
+    S.idx = i;
+    S.logged = 0;
+    var p = S.plan[i];
+    S.leftMs = p.mins * 60000;
+    render();
+    if (autoStart) start();
+  }
+
+  function finishSegment() {
+    var p = S.plan[S.idx];
+    credit();
+    alertUser(p);
+    if (S.idx + 1 >= S.plan.length) {
+      stopTicking();
+      S.leftMs = 0;
+      el.time.textContent = "00:00";
+      el.phase.textContent = "All done. Great work!";
+      el.startBtn.textContent = "Start";
+      el.tipBox.classList.remove("hidden");
+      el.tipLabel.textContent = "Session finished";
+      el.tipText.textContent = "Close the book, drink water, and rest your eyes. Tomorrow, review what you studied for 5 minutes before starting new material.";
+      S.idx = S.plan.length - 1;
+      renderList();
+      return;
+    }
+    goTo(S.idx + 1, true);
+  }
+
+  /* ---------- Alerts ---------- */
+  var audioCtx = null;
+  function unlockAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) {}
+  }
+  function beep(freq, when, dur) {
+    if (!audioCtx) return;
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    var t = audioCtx.currentTime + when;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function alertUser(p) {
+    unlockAudio();
+    var next = S.plan[S.idx + 1];
+    if (next && next.type === "rest") { beep(880, 0, 0.25); beep(660, 0.3, 0.25); beep(520, 0.6, 0.4); }
+    else { beep(520, 0, 0.25); beep(660, 0.3, 0.25); beep(880, 0.6, 0.4); }
+    try { if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 400]); } catch (e) {}
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        var body = next ? (next.type === "rest" ? "Time to rest: " + next.tip : "Back to focus.") : "Session complete.";
+        new Notification(next ? segLabel(next) : "Done", { body: body });
+      }
+    } catch (e) {}
+  }
+  function askNotify() {
+    try {
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    } catch (e) {}
+  }
+
+  /* Keep the screen on while running (where supported) */
+  var wake = null;
+  function requestWake() {
+    try {
+      if (navigator.wakeLock && !wake) {
+        navigator.wakeLock.request("screen").then(function (w) {
+          wake = w; w.addEventListener("release", function () { wake = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function releaseWake() {
+    try { if (wake) { wake.release(); wake = null; } } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      if (S.running) { requestWake(); tick(); }
+    }
+  });
+
+  /* ---------- Reading log ---------- */
+  var LOG = {};          // { "2026-10-24": seconds }
+  var GOAL = 120;        // minutes per day
+  var storeOK = true;
+  var now0 = new Date();
+  var viewY = now0.getFullYear(), viewM = now0.getMonth();
+  var SEL = null;
+
+  function dkey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function todayKey() { return dkey(new Date()); }
+  SEL = todayKey();
+
+  function loadLog() {
+    try {
+      var d = JSON.parse(localStorage.getItem("pomoLog") || "null");
+      if (d) { LOG = d.log || {}; GOAL = d.goal || 120; }
+      $("goal").value = GOAL;
+    } catch (e) { storeOK = false; }
+    saveLog();
+  }
+  function saveLog() {
+    try { localStorage.setItem("pomoLog", JSON.stringify({ log: LOG, goal: GOAL })); }
+    catch (e) { storeOK = false; }
+  }
+
+  function addSecs(key, secs) {
+    LOG[key] = Math.max(0, (LOG[key] || 0) + secs);
+    if (LOG[key] === 0) delete LOG[key];
+    saveLog();
+    renderLog();
+  }
+
+  // Add the focus time that has passed since the last time we counted it.
+  function credit() {
+    var p = S.plan[S.idx];
+    if (!p || p.type !== "focus") return;
+    var elapsed = p.mins * 60000 - currentLeft();
+    var delta = elapsed - S.logged;
+    if (delta >= 1000) {
+      var secs = Math.floor(delta / 1000);
+      S.logged += secs * 1000;
+      addSecs(todayKey(), secs);
+    }
+  }
+
+  function secsToMin(s) { return Math.floor(s / 60); }
+  function fmtShort(m) {
+    if (m < 60) return m + "m";
+    var h = Math.floor(m / 60), r = m % 60;
+    return r ? h + "h" + pad(r) : h + "h";
+  }
+  function fmtLong(m) { return m === 0 ? "0 min" : fmtDur(m); }
+
+  function sumDays(endDate, count) {
+    var total = 0, d = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    for (var i = 0; i < count; i++) {
+      total += LOG[dkey(d)] || 0;
+      d.setDate(d.getDate() - 1);
+    }
+    return total;
+  }
+
+  function streak() {
+    var d = new Date();
+    if ((LOG[dkey(d)] || 0) < 60) d.setDate(d.getDate() - 1);
+    var n = 0;
+    while ((LOG[dkey(d)] || 0) >= 60 && n < 3650) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+
+  function level(secs) {
+    var goal = GOAL * 60;
+    if (secs < 60) return 0;
+    if (secs >= goal) return 4;
+    var r = secs / goal;
+    return r < 0.34 ? 1 : (r < 0.67 ? 2 : 3);
+  }
+
+  function renderLog() {
+    var today = LOG[todayKey()] || 0;
+    var tm = secsToMin(today);
+    $("todayLine").textContent = "Today: " + fmtLong(tm) + " of " + fmtLong(GOAL) + " goal";
+    $("stToday").textContent = fmtShort(tm);
+    $("stWeek").textContent = fmtShort(secsToMin(sumDays(new Date(), 7)));
+    $("stStreak").textContent = streak();
+
+    var pct = Math.min(100, Math.round(today / (GOAL * 60) * 100));
+    $("goalFill").style.width = pct + "%";
+    $("goalBar").setAttribute("aria-valuenow", pct);
+
+    // month total
+    var monthSecs = 0;
+    var first = new Date(viewY, viewM, 1);
+    var daysIn = new Date(viewY, viewM + 1, 0).getDate();
+    for (var d = 1; d <= daysIn; d++) monthSecs += LOG[dkey(new Date(viewY, viewM, d))] || 0;
+    $("stMonth").textContent = fmtShort(secsToMin(monthSecs));
+    $("monthName").textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+    // calendar grid
+    var cal = $("cal");
+    cal.innerHTML = "";
+    ["S", "M", "T", "W", "T", "F", "S"].forEach(function (w) {
+      var s = document.createElement("div");
+      s.className = "wd"; s.textContent = w; cal.appendChild(s);
+    });
+    for (var b = 0; b < first.getDay(); b++) {
+      var blank = document.createElement("div");
+      blank.className = "blank"; cal.appendChild(blank);
+    }
+    var tk = todayKey();
+    for (var day = 1; day <= daysIn; day++) {
+      (function (dayNum) {
+        var date = new Date(viewY, viewM, dayNum);
+        var key = dkey(date);
+        var secs = LOG[key] || 0;
+        var m = secsToMin(secs);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "day l" + level(secs) + (key === tk ? " is-today" : "") + (key === SEL ? " sel" : "");
+        btn.setAttribute("aria-label", date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) + ", " + fmtLong(m));
+        var n = document.createElement("span"); n.textContent = dayNum;
+        var sm = document.createElement("small"); sm.textContent = m > 0 ? fmtShort(m) : "";
+        btn.appendChild(n); btn.appendChild(sm);
+        btn.addEventListener("click", function () { SEL = key; renderLog(); });
+        cal.appendChild(btn);
+      })(day);
+    }
+
+    // selected day
+    var parts = SEL.split("-");
+    var sd = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    $("dayInfo").textContent = sd.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) +
+      ": " + fmtLong(secsToMin(LOG[SEL] || 0));
+
+    $("storeNote").textContent = storeOK ? "" :
+      "Your log can't be saved in this view and will reset when you close it. Open the file in your phone's browser to keep it.";
+  }
+
+  function shiftMonth(delta) {
+    viewM += delta;
+    if (viewM < 0) { viewM = 11; viewY--; }
+    if (viewM > 11) { viewM = 0; viewY++; }
+    renderLog();
+  }
+
+  $("prevM").addEventListener("click", function () { shiftMonth(-1); });
+  $("nextM").addEventListener("click", function () { shiftMonth(1); });
+  $("goal").addEventListener("change", function () {
+    GOAL = num($("goal"), 5, 720, 120);
+    saveLog(); renderLog();
+  });
+  $("addBtn").addEventListener("click", function () {
+    var v = parseInt($("addMin").value, 10);
+    if (isNaN(v) || v === 0) return;
+    addSecs(SEL, v * 60);
+    $("addMin").value = "";
+  });
+
+  /* ---------- Events ---------- */
+  el.planBtn.addEventListener("click", makePlan);
+  el.startBtn.addEventListener("click", function () { S.running ? pause() : start(); });
+  el.skipBtn.addEventListener("click", function () {
+    if (S.idx + 1 < S.plan.length) goTo(S.idx + 1, S.running);
+  });
+  el.resetBtn.addEventListener("click", function () { goTo(0, false); });
+  el.tipBtn.addEventListener("click", function () {
+    var p = S.plan[S.idx];
+    if (!p || p.type !== "rest") return;
+    var list = p.long ? LONG_RESTS : SHORT_RESTS;
+    var cur = list.indexOf(p.tip);
+    p.tip = list[(cur + 1) % list.length];
+    render();
+  });
+  setInterval(function () { if (S.plan.length && !S.running) renderList(); }, 30000);
+
+  load();
+  loadLog();
+  renderLog();
+})();
+</script>
+</body>
+</html>
